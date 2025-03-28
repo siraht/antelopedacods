@@ -24,12 +24,6 @@ def show_record_creation_page():
                 "AdmissionType", "ProviderLocationId"
             ])
             
-        if "survey_df" not in st.session_state:
-            st.session_state.survey_df = pd.DataFrame(columns=[
-                "ProviderId", "ProviderClientId", "ProviderAdmissionId", "SurveyDate",
-                "Housing", "Employment", "Alcohol", "Drug", "Legal", "Family", "Medical", "MentalHealth"
-            ])
-            
         if "discharges_df" not in st.session_state:
             st.session_state.discharges_df = pd.DataFrame(columns=[
                 "ProviderId", "ProviderClientId", "ProviderAdmissionId", "DischargeDate",
@@ -197,21 +191,7 @@ def show_client_admission_survey_form():
                 # Primary clinician
                 primary_clinician = st.text_input("Primary Clinician", value=DEFAULT_PRIMARY_CLINICIAN)
             
-            # Basic survey information (still keeping it for backward compatibility)
-            st.markdown("#### Basic Assessment")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                housing = st.selectbox("Housing", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-                employment = st.selectbox("Employment", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-                alcohol = st.selectbox("Alcohol", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-                drug = st.selectbox("Drug", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-            
-            with col2:
-                legal = st.selectbox("Legal", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-                family = st.selectbox("Family", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-                medical = st.selectbox("Medical", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-                mental_health = st.selectbox("Mental Health", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
+
             
             submit_button = st.form_submit_button("Create Basic Records")
             
@@ -255,28 +235,11 @@ def show_client_admission_survey_form():
                     "FirstContactDate": first_contact_date
                 }
                 
-                # Create basic survey record
-                new_survey = {
-                    "ProviderId": PROVIDERID,
-                    "ProviderClientId": client_id,
-                    "ProviderAdmissionId": admission_id,
-                    "SurveyDate": admission_date,
-                    "Housing": housing,
-                    "Employment": employment,
-                    "Alcohol": alcohol,
-                    "Drug": drug,
-                    "Legal": legal,
-                    "Family": family,
-                    "Medical": medical,
-                    "MentalHealth": mental_health
-                }
-                
                 # Add records to DataFrames
                 if client_type == "New Client":
                     st.session_state.clients_df = pd.concat([st.session_state.clients_df, pd.DataFrame([new_client])], ignore_index=True)
                 
                 st.session_state.admissions_df = pd.concat([st.session_state.admissions_df, pd.DataFrame([new_admission])], ignore_index=True)
-                st.session_state.survey_df = pd.concat([st.session_state.survey_df, pd.DataFrame([new_survey])], ignore_index=True)
                 
                 # Store admission ID in session state for survey tab
                 st.session_state.current_admission_id = admission_id

@@ -120,7 +120,7 @@ def generate_admission_id(client_id, first_name=None, last_name=None, admission_
     # Create ID with parts: ADM + last 4 of client ID + initials + date
     # Make sure the total is not more than 15 characters
     client_id_part = str(client_id)[-4:] if client_id else ""
-    admission_id = f"ADM{client_id_part}{initials}{date_str}"
+    admission_id = f"{client_id_part}{initials}{date_str}"
     
     # Ensure it's no longer than 15 characters
     if len(admission_id) > 15:
