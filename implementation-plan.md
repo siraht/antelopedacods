@@ -174,4 +174,23 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 
 ---
 
-This `implementation-plan.mdc` provides a structured, actionable guide for developing the Streamlit web application. Each step is designed to be completed sequentially by an AI coding tool like Cursor or Windsurf, with updates to the plan ensuring a transparent work log as per the project rule. The plan covers all required functionality—data ingestion, management, UI, record creation, and export—while maintaining a client-side approach using Streamlit and Pandas.
+## Step 11: Modularize the Application
+
+**Objective**: Refactor the application into a modular structure for improved maintainability and code organization.
+
+**Actions**:
+- Create a structured directory layout with `/src/components/` and `/src/utils/`
+- Extract functionality into dedicated modules:
+  - Move constants and mappings to `config.py`
+  - Move data validation functions to `data_models.py`
+  - Create component modules for each app section (data_ingestion, data_table, record_creation, data_export)
+  - Move utility functions to appropriate modules under `/src/utils/`
+- Update the main app to import and use these modules
+
+**Update**:
+- [x] Done
+- Summary: Created modular directory structure with dedicated files for configurations, data models, components, and utilities. Implemented cleaner main app that imports functionality from these modules.
+
+---
+
+This `implementation-plan.md` provides a structured, actionable guide for developing the Streamlit web application. Each step is designed to be completed sequentially by an AI coding tool like Cursor or Windsurf, with updates to the plan ensuring a transparent work log as per the project rule. The plan covers all required functionality—data ingestion, management, UI, record creation, and export—while maintaining a client-side approach using Streamlit and Pandas.
