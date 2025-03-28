@@ -46,22 +46,52 @@ def show_record_creation_page():
 
 def show_client_admission_survey_form():
     """Display and handle the client+admission+survey form."""
+    # Add radio button to choose between new client and existing client
+    client_type = st.radio("Select Client Type", ["New Client", "Existing Client"])
+    
     with st.form("client_admission_form"):
-        st.subheader("Create Client with Admission and Survey")
+        st.subheader("Create Admission and Survey")
         
         # Client information
         st.markdown("#### Client Information")
-        col1, col2 = st.columns(2)
         
-        with col1:
-            client_id = st.text_input("Provider Client ID", help="Unique identifier for the client")
-            first_name = st.text_input("First Name")
-            date_of_birth = st.text_input("Date of Birth (MM/DD/YYYY)")
-        
-        with col2:
-            last_name = st.text_input("Last Name")
-            gender = st.selectbox("Gender", options=list(GENDER_OPTIONS.keys()))
-            zip_code = st.text_input("Zip Code")
+        if client_type == "Existing Client":
+            # Show dropdown to select existing client
+            if not st.session_state.clients_df.empty:
+                client_options = st.session_state.clients_df.apply(
+                    lambda row: f"{row['ProviderClientId']} - {row['FirstName']} {row['LastName']}",
+                    axis=1
+                ).tolist()
+                selected_client = st.selectbox("Select Client", client_options)
+                client_id = selected_client.split(' - ')[0] if selected_client else ''
+                
+                # Get client details
+                client_data = st.session_state.clients_df[st.session_state.clients_df['ProviderClientId'] == client_id].iloc[0]
+                first_name = client_data['FirstName']
+                last_name = client_data['LastName']
+                date_of_birth = client_data['DateofBirth']
+                gender = client_data['Gender']
+                zip_code = client_data['ZipCode']
+                
+                # Display client details
+                st.markdown(f"**Name:** {first_name} {last_name}")
+                st.markdown(f"**Date of Birth:** {date_of_birth}")
+                st.markdown(f"**Gender:** {gender}")
+                st.markdown(f"**Zip Code:** {zip_code}")
+            else:
+                st.error("No existing clients found. Please create a new client.")
+                return
+        else:
+            # Show form fields for new client
+            col1, col2 = st.columns(2)
+            with col1:
+                client_id = st.text_input("Provider Client ID", help="Unique identifier for the client")
+                first_name = st.text_input("First Name")
+                date_of_birth = st.text_input("Date of Birth (MM/DD/YYYY)")
+            with col2:
+                last_name = st.text_input("Last Name")
+                gender = st.selectbox("Gender", options=list(GENDER_OPTIONS.keys()))
+                zip_code = st.text_input("Zip Code")
         
         # Admission information
         st.markdown("#### Admission Information")
@@ -90,15 +120,21 @@ def show_client_admission_survey_form():
         submit_button = st.form_submit_button("Create Records")
         
         if submit_button:
-            if not validate_date(date_of_birth) or not validate_date(admission_date):
-                st.error("Please enter valid dates in MM/DD/YYYY format.")
+            if not validate_date(admission_date):
+                st.error("Please enter a valid admission date in MM/DD/YYYY format.")
                 return
                 
-            # Create client record
-            new_client = {
-                "ProviderClientId": client_id,
-                "FirstName": first_name,
-                "LastName": last_name,
+            # Only validate date of birth for new clients
+            if client_type == "New Client":
+                if not validate_date(date_of_birth):
+                    st.error("Please enter a valid date of birth in MM/DD/YYYY format.")
+                    return
+                    
+                # Create client record
+                new_client = {
+                    "ProviderClientId": client_id,
+                    "FirstName": first_name,
+                    "LastName": last_name,
                 "DateofBirth": date_of_birth,
                 "Gender": gender,
                 "ZipCode": validate_zip(zip_code)
@@ -134,11 +170,16 @@ def show_client_admission_survey_form():
             }
             
             # Add records to DataFrames
-            st.session_state.clients_df = pd.concat([st.session_state.clients_df, pd.DataFrame([new_client])], ignore_index=True)
+            if client_type == "New Client":
+                st.session_state.clients_df = pd.concat([st.session_state.clients_df, pd.DataFrame([new_client])], ignore_index=True)
+            
             st.session_state.admissions_df = pd.concat([st.session_state.admissions_df, pd.DataFrame([new_admission])], ignore_index=True)
             st.session_state.survey_df = pd.concat([st.session_state.survey_df, pd.DataFrame([new_survey])], ignore_index=True)
             
-            st.success(f"Successfully created client, admission, and survey records for {first_name} {last_name}.")
+            if client_type == "New Client":
+                st.success(f"Successfully created client, admission, and survey records for {first_name} {last_name}.")
+            else:
+                st.success(f"Successfully created admission and survey records for {first_name} {last_name}.")
 
 def show_discharge_form():
     """Display and handle the discharge form."""

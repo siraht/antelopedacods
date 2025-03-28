@@ -20,6 +20,18 @@ def normalize_dataframe(df):
     # Apply field mapping
     df = df.rename(columns=FIELD_MAPPING)
     
+    # Replace NaN values with empty strings
+    df = df.fillna('')
+    
+    # Ensure all columns are string type
+    for col in df.columns:
+        df[col] = df[col].astype(str).replace('nan', '')
+    
+    # Format dates if the column exists
+    if 'DateofBirth' in df.columns:
+        from src.data_models import format_date
+        df['DateofBirth'] = df['DateofBirth'].apply(lambda x: format_date(str(x)) if x else '')
+    
     return df
 
 def handle_missing_fields(df, required_fields=None):

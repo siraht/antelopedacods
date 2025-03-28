@@ -4,22 +4,64 @@ Data models and validation functions for the application.
 import re
 from datetime import datetime
 
-# Date validation regex pattern (MM/DD/YYYY)
-DATE_PATTERN = r'^(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/\d{4}$'
+# Date validation regex pattern (M/DD/YYYY or MM/DD/YYYY)
+DATE_PATTERN = r'^([1-9]|0[1-9]|1[0-2])/([0-9]|0[1-9]|[12][0-9]|3[01])/\d{4}$'
+
+def format_date(date_str):
+    """
+    Format a date string to MM/DD/YYYY format.
+    
+    Args:
+        date_str (str): Date string in M/DD/YYYY or MM/DD/YYYY format
+        
+    Returns:
+        str: Date string in MM/DD/YYYY format, or empty string if invalid
+    """
+    try:
+        if not date_str or not isinstance(date_str, str):
+            return ""
+        # Parse the date string
+        date_obj = datetime.strptime(date_str.strip(), "%m/%d/%Y")
+        # Format it consistently as MM/DD/YYYY
+        return date_obj.strftime("%m/%d/%Y")
+    except ValueError:
+        try:
+            # Try parsing with single digit month
+            date_obj = datetime.strptime(date_str.strip(), "%-m/%d/%Y")
+            return date_obj.strftime("%m/%d/%Y")
+        except ValueError:
+            return ""
 
 def validate_date(date_str):
     """
-    Validate if the input string is in MM/DD/YYYY format.
+    Validate if the input string is in M/DD/YYYY or MM/DD/YYYY format.
+    Empty strings are considered valid.
     
     Args:
         date_str (str): Date string to validate
         
     Returns:
-        bool: True if valid date format, False otherwise
+        bool: True if valid date format or empty, False otherwise
     """
-    if not date_str or not isinstance(date_str, str):
+    if not isinstance(date_str, str):
         return False
-    return bool(re.match(DATE_PATTERN, date_str))
+        
+    # Allow empty strings
+    if not date_str.strip():
+        return True
+    
+    # First check if it matches our pattern
+    if not re.match(DATE_PATTERN, date_str):
+        return False
+    
+    # Then try to parse it to ensure it's a valid date
+    try:
+        month, day, year = map(int, date_str.split('/'))
+        # Check if it's a valid date
+        datetime(year, month, day)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 def validate_zip(zip_str):
     """
