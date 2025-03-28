@@ -318,9 +318,13 @@ def show_client_admission_survey_form():
                 # Add submit button at the end of the form
                 submit_survey = st.form_submit_button("Submit Survey")
                 
+                # Check if form was submitted
                 if submit_survey:
                     # Validate all answers
                     if survey_engine.validate_all():
+                        # Clear any previous error messages
+                        if 'validation_errors' in st.session_state:
+                            del st.session_state.validation_errors
                         # Get formatted answers
                         formatted_answers = survey_engine.get_formatted_answers()
                         
@@ -353,7 +357,12 @@ def show_client_admission_survey_form():
                         
                         st.success("Successfully saved admission survey data.")
                     else:
-                        st.error("Please correct the errors in the survey before submitting.")
+                        # Show all validation errors
+                        st.error("Please correct the following errors:")
+                        for seq_num, error_msg in survey_engine.errors.items():
+                            question = next((q for q in survey_engine.questions if q["sequence_number"] == seq_num), None)
+                            if question:
+                                st.error(f"Question {seq_num} ({question['question_text']}): {error_msg}")
         else:
             st.warning("Please create an admission record first in the Basic Information tab.")
 

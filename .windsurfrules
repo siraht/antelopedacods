@@ -1,2 +1,3 @@
 # Project Rules
 - Refer to data-reference.md for data structure and field mappings.
+- The app does not need to be terminated or restarted to see changes; there is a Rerun button in the Streamlit interface.

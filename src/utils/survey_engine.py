@@ -195,6 +195,8 @@ class SurveyEngine:
         
         # Set key for the form field
         field_key = f"survey_q{seq_num}"
+        # Set key for validation on change
+        on_change_key = f"validate_q{seq_num}"
         
         # Check if field should be disabled based on rules
         field_disabled = False
@@ -202,6 +204,10 @@ class SurveyEngine:
         # Get current value from session state
         current_value = self.answers.get(seq_num, default_value)
         
+        # Clear existing error for this field before validation
+        if seq_num in self.errors:
+            del self.errors[seq_num]
+            
         # Apply rules if any
         if question["rules"]:
             for rule in question["rules"]:
@@ -216,10 +222,15 @@ class SurveyEngine:
                         field_disabled = True
                         break
         
+        # Helper to create field label with error indication if present
+        label = question_text
+        if seq_num in self.errors:
+            label = f"{question_text} ⚠️"
+        
         # Render the field based on its type
         if field_type == "date":
             value = container.text_input(
-                question_text, 
+                label, 
                 value=current_value,
                 key=field_key,
                 disabled=field_disabled
@@ -235,7 +246,7 @@ class SurveyEngine:
             max_val = valid_values.get("max", 999) if valid_values else 999
             
             value = container.text_input(
-                question_text, 
+                label, 
                 value=current_value,
                 key=field_key,
                 disabled=field_disabled
@@ -270,7 +281,7 @@ class SurveyEngine:
                     selected_index = valid_values.index(current_value)
                     
                 selected_option = container.selectbox(
-                    question_text,
+                    label,
                     options=display_options,
                     index=selected_index,
                     key=field_key,
@@ -285,7 +296,7 @@ class SurveyEngine:
             else:
                 # Simple select without descriptions
                 value = container.selectbox(
-                    question_text,
+                    label,
                     options=options,
                     key=field_key,
                     disabled=field_disabled
@@ -308,7 +319,7 @@ class SurveyEngine:
                     selected_index = values.index(current_value)
                 
                 selected_option = container.radio(
-                    question_text,
+                    label,
                     options=options,
                     index=selected_index,
                     key=field_key,
@@ -326,7 +337,7 @@ class SurveyEngine:
                     selected_index = 1
                 
                 selected_option = container.radio(
-                    question_text,
+                    label,
                     options=["Yes", "No"],
                     index=selected_index,
                     key=field_key,
@@ -347,6 +358,10 @@ class SurveyEngine:
         # Save answer to answers dict
         self.answers[seq_num] = value
         
+        # Display error if present
+        if seq_num in self.errors:
+            container.error(self.errors[seq_num])
+        
         return value
     
     def render_survey_form(self, questions_per_row=2):
@@ -359,6 +374,9 @@ class SurveyEngine:
         Returns:
             dict: Dictionary of survey answers
         """
+        # Validate all fields before rendering
+        self.validate_all()
+        
         # Group questions into rows
         for i in range(0, len(self.questions), questions_per_row):
             row_questions = self.questions[i:i+questions_per_row]
@@ -371,21 +389,90 @@ class SurveyEngine:
                 if j < len(cols):
                     self.render_question(question, cols[j])
         
-        # Show validation errors if any
-        if self.errors:
-            st.error("Please fix the following errors:")
-            for seq_num, error in self.errors.items():
-                question_text = ""
-                for q in self.questions:
-                    if q["sequence_number"] == seq_num:
-                        question_text = q["question_text"]
+        # Return answers dictionary
+        return self.answers
+    
+    def validate_field(self, seq_num):
+        """
+        Validate a single field and any dependent fields.
+        
+        Args:
+            seq_num: Sequence number of the field to validate
+        """
+        # Find the question
+        question = None
+        for q in self.questions:
+            if q["sequence_number"] == seq_num:
+                question = q
+                break
+                
+        if not question:
+            return
+            
+        # Clear error for this field
+        if seq_num in self.errors:
+            del self.errors[seq_num]
+            
+        value = self.answers.get(seq_num, "")
+        
+        # Check if field is required
+        if question.get("required", False) and not value:
+            self.errors[seq_num] = "This field is required"
+            return
+        
+        # Skip validation if field is empty and not required
+        if not value:
+            return
+        
+        # Apply rules
+        if question.get("rules"):
+            for rule in question["rules"]:
+                if self.evaluate_rule(rule, value):
+                    _, is_valid, error_msg = self.apply_rule_action(question, value, rule)
+                    if not is_valid:
+                        self.errors[seq_num] = error_msg
+                        return
+        
+        # Type-specific validation
+        field_type = question["field_type"]
+        
+        if field_type == "date" and value:
+            if not validate_date(value):
+                self.errors[seq_num] = "Please enter a valid date in MM/DD/YYYY format"
+                
+        elif field_type == "numeric" and value:
+            valid_values = question["valid_values"]
+            min_val = valid_values.get("min", 0) if valid_values else 0
+            max_val = valid_values.get("max", 999) if valid_values else 999
+            
+            try:
+                num_value = int(value)
+                if num_value < min_val or num_value > max_val:
+                    self.errors[seq_num] = f"Value must be between {min_val} and {max_val}"
+            except ValueError:
+                self.errors[seq_num] = "Please enter a valid number"
+                
+        # Find and validate dependent fields
+        self.validate_dependent_fields(seq_num)
+        
+    def validate_dependent_fields(self, seq_num):
+        """
+        Validate fields that depend on the given field.
+        
+        Args:
+            seq_num: Sequence number of the field that changed
+        """
+        # Find all questions that have rules depending on this field
+        for question in self.questions:
+            has_dependency = False
+            if question["rules"]:
+                for rule in question["rules"]:
+                    if "dependencies" in rule and seq_num in rule["dependencies"]:
+                        has_dependency = True
                         break
                         
-                st.error(f"Question {seq_num} ({question_text}): {error}")
-            
-            return None
-            
-        return self.answers
+            if has_dependency:
+                self.validate_field(question["sequence_number"])
     
     def validate_all(self):
         """
@@ -399,35 +486,7 @@ class SurveyEngine:
         # Process all rules and validate fields
         for question in self.questions:
             seq_num = question["sequence_number"]
-            value = self.answers.get(seq_num, "")
-            
-            # Apply rules
-            if question["rules"]:
-                for rule in question["rules"]:
-                    if self.evaluate_rule(rule, value):
-                        _, is_valid, error_msg = self.apply_rule_action(question, value, rule)
-                        
-                        if not is_valid:
-                            self.errors[seq_num] = error_msg
-            
-            # Type-specific validation
-            field_type = question["field_type"]
-            
-            if field_type == "date" and value:
-                if not validate_date(value):
-                    self.errors[seq_num] = "Please enter a valid date in MM/DD/YYYY format"
-                    
-            elif field_type == "numeric" and value:
-                valid_values = question["valid_values"]
-                min_val = valid_values.get("min", 0) if valid_values else 0
-                max_val = valid_values.get("max", 999) if valid_values else 999
-                
-                try:
-                    num_value = int(value)
-                    if num_value < min_val or num_value > max_val:
-                        self.errors[seq_num] = f"Value must be between {min_val} and {max_val}"
-                except ValueError:
-                    self.errors[seq_num] = "Please enter a valid number"
+            self.validate_field(seq_num)
         
         # Check for cross-field validations
         self.validate_cross_field()
@@ -443,12 +502,15 @@ class SurveyEngine:
         secondary_drug = self.answers.get("74", "")
         tertiary_drug = self.answers.get("75", "")
         
-        if primary_drug and secondary_drug and primary_drug == secondary_drug:
+        # Check if secondary drug matches primary drug (unless secondary is "None")
+        if primary_drug and secondary_drug and secondary_drug != "0" and primary_drug == secondary_drug:
             self.errors["74"] = "Secondary drug cannot be the same as primary drug"
             
-        if secondary_drug and tertiary_drug and secondary_drug == tertiary_drug:
+        # Check if tertiary drug matches secondary drug (unless secondary is "None")
+        if secondary_drug and tertiary_drug and secondary_drug != "0" and secondary_drug == tertiary_drug:
             self.errors["75"] = "Tertiary drug cannot be the same as secondary drug"
             
+        # Check if tertiary drug matches primary drug
         if primary_drug and tertiary_drug and primary_drug == tertiary_drug:
             self.errors["75"] = "Tertiary drug cannot be the same as primary drug"
             
@@ -463,7 +525,17 @@ class SurveyEngine:
         """
         formatted = {}
         
+        # First, initialize all answers to empty string
+        for question in self.questions:
+            seq_num = question["sequence_number"]
+            formatted[seq_num] = ""
+        
+        # Then update with actual answers
         for seq_num, value in self.answers.items():
+            # Skip if value is None or empty string
+            if value is None or value == "":
+                continue
+                
             # Find the question
             question = None
             for q in self.questions:
@@ -477,18 +549,17 @@ class SurveyEngine:
             # Format based on field type
             field_type = question["field_type"]
             
-            if field_type == "date" and value:
-                formatted[seq_num] = format_date(value)
-            elif field_type == "numeric" and value:
-                # Zero pad numeric values based on max value length
-                valid_values = question["valid_values"]
-                if valid_values:
-                    max_val = valid_values.get("max", 999)
+            if field_type == "date":
+                formatted[seq_num] = format_date(value) if value else ""
+            elif field_type == "numeric":
+                if value:
+                    # Zero pad numeric values based on max value length
+                    valid_values = question.get("valid_values", {})
+                    max_val = valid_values.get("max", 999) if valid_values else 999
                     pad_length = len(str(max_val))
                     formatted[seq_num] = value.zfill(pad_length)
-                else:
-                    formatted[seq_num] = value
             else:
+                # For all other types, use value as is
                 formatted[seq_num] = value
                 
         return formatted
