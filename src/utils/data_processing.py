@@ -23,14 +23,41 @@ def normalize_dataframe(df):
     # Replace NaN values with empty strings
     df = df.fillna('')
     
+    # Handle numeric IDs first (before general string conversion)
+    id_columns = ['ProviderClientId', 'ProviderAdmissionId']
+    for col in id_columns:
+        if col in df.columns:
+            # Convert numeric values to integers first to remove decimal points
+            df[col] = df[col].apply(lambda x: str(int(float(x))) if pd.notnull(x) and str(x).strip() != '' else str(x))
+    
     # Ensure all columns are string type
     for col in df.columns:
-        df[col] = df[col].astype(str).replace('nan', '')
+        if col not in id_columns:  # Skip ID columns as they're already handled
+            df[col] = df[col].astype(str).replace('nan', '')
     
     # Format dates if the column exists
     if 'DateofBirth' in df.columns:
         from src.data_models import format_date
         df['DateofBirth'] = df['DateofBirth'].apply(lambda x: format_date(str(x)) if x else '')
+    
+    # Handle ClientFullName field if it exists
+    if 'ClientFullName' in df.columns and not df['ClientFullName'].empty:
+        # If FirstName/LastName don't exist, create them
+        if 'FirstName' not in df.columns or df['FirstName'].eq('').all():
+            df['FirstName'] = ''
+        if 'LastName' not in df.columns or df['LastName'].eq('').all():
+            df['LastName'] = ''
+            
+        # Split ClientFullName into FirstName and LastName
+        for idx, row in df.iterrows():
+            if row['ClientFullName'] and not (row['FirstName'] and row['LastName']):
+                # Split the name on the last space found
+                name_parts = row['ClientFullName'].strip().split()
+                if len(name_parts) > 1:
+                    df.at[idx, 'FirstName'] = ' '.join(name_parts[:-1])  # Everything before the last part
+                    df.at[idx, 'LastName'] = name_parts[-1]  # Last part
+                elif len(name_parts) == 1:
+                    df.at[idx, 'LastName'] = name_parts[0]  # Only one name component
     
     return df
 

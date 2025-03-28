@@ -30,11 +30,13 @@ FIELD_MAPPING = {
     "last name": "LastName",
     "lastname": "LastName",
     "last": "LastName",
+    "client": "ClientFullName",  # New mapping for the Client field
     "date of birth": "DateofBirth",
     "dateofbirth": "DateofBirth",
     "dob": "DateofBirth",
     "birth date": "DateofBirth",
     "birthdate": "DateofBirth",
+    "biological sex": "Gender",
     "gender": "Gender",
     "sex": "Gender",
     "zip": "ZipCode",

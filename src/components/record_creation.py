@@ -46,8 +46,51 @@ def show_record_creation_page():
 
 def show_client_admission_survey_form():
     """Display and handle the client+admission+survey form."""
+    # Initialize session state for selected client
+    if 'selected_client_id' not in st.session_state:
+        st.session_state.selected_client_id = None
+        st.session_state.selected_client_data = None
+    
     # Add radio button to choose between new client and existing client
-    client_type = st.radio("Select Client Type", ["New Client", "Existing Client"])
+    client_type = st.radio("Select Client Type", ["New Client", "Existing Client"], key="client_type")
+    
+    # Handle client selection/input before the form
+    if client_type == "Existing Client":
+        if not st.session_state.clients_df.empty:
+            # Create client options with name first
+            client_options_dict = {}
+            for _, row in st.session_state.clients_df.iterrows():
+                display_name = f"{row['FirstName']} {row['LastName']} (ID: {row['ProviderClientId']})"
+                client_options_dict[display_name] = row['ProviderClientId']
+            
+            # Create sorted list of options
+            client_options = sorted(client_options_dict.keys())
+            
+            # Add empty option at the beginning
+            client_options = ["Select a client..."] + client_options
+            
+            # Show dropdown to select existing client
+            selected_client = st.selectbox("Select Client", client_options, key="client_selector")
+            
+            if selected_client != "Select a client...":
+                # Extract client ID from the dictionary using the display name
+                client_id = client_options_dict[selected_client]
+                if client_id != st.session_state.selected_client_id:
+                    # Update session state with new selection
+                    st.session_state.selected_client_id = client_id
+                    st.session_state.selected_client_data = st.session_state.clients_df[
+                        st.session_state.clients_df['ProviderClientId'] == client_id
+                    ].iloc[0].to_dict()
+            else:
+                st.session_state.selected_client_id = None
+                st.session_state.selected_client_data = None
+        else:
+            st.error("No existing clients found. Please create a new client.")
+            return
+    else:
+        # Reset selected client when switching to new client
+        st.session_state.selected_client_id = None
+        st.session_state.selected_client_data = None
     
     with st.form("client_admission_form"):
         st.subheader("Create Admission and Survey")
@@ -55,32 +98,22 @@ def show_client_admission_survey_form():
         # Client information
         st.markdown("#### Client Information")
         
-        if client_type == "Existing Client":
-            # Show dropdown to select existing client
-            if not st.session_state.clients_df.empty:
-                client_options = st.session_state.clients_df.apply(
-                    lambda row: f"{row['ProviderClientId']} - {row['FirstName']} {row['LastName']}",
-                    axis=1
-                ).tolist()
-                selected_client = st.selectbox("Select Client", client_options)
-                client_id = selected_client.split(' - ')[0] if selected_client else ''
-                
-                # Get client details
-                client_data = st.session_state.clients_df[st.session_state.clients_df['ProviderClientId'] == client_id].iloc[0]
-                first_name = client_data['FirstName']
-                last_name = client_data['LastName']
-                date_of_birth = client_data['DateofBirth']
-                gender = client_data['Gender']
-                zip_code = client_data['ZipCode']
-                
-                # Display client details
-                st.markdown(f"**Name:** {first_name} {last_name}")
-                st.markdown(f"**Date of Birth:** {date_of_birth}")
-                st.markdown(f"**Gender:** {gender}")
-                st.markdown(f"**Zip Code:** {zip_code}")
-            else:
-                st.error("No existing clients found. Please create a new client.")
-                return
+        if client_type == "Existing Client" and st.session_state.selected_client_data:
+            # Display client details
+            client_data = st.session_state.selected_client_data
+            st.markdown(f"**Provider Client ID:** {client_data['ProviderClientId']}")
+            st.markdown(f"**Name:** {client_data['FirstName']} {client_data['LastName']}")
+            st.markdown(f"**Date of Birth:** {client_data['DateofBirth']}")
+            st.markdown(f"**Gender:** {client_data['Gender']}")
+            st.markdown(f"**Zip Code:** {client_data['ZipCode']}")
+            
+            # Store values for form processing
+            client_id = client_data['ProviderClientId']
+            first_name = client_data['FirstName']
+            last_name = client_data['LastName']
+            date_of_birth = client_data['DateofBirth']
+            gender = client_data['Gender']
+            zip_code = client_data['ZipCode']
         else:
             # Show form fields for new client
             col1, col2 = st.columns(2)
