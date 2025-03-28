@@ -35,10 +35,12 @@ def normalize_dataframe(df):
         if col not in id_columns:  # Skip ID columns as they're already handled
             df[col] = df[col].astype(str).replace('nan', '')
     
-    # Format dates if the column exists
-    if 'DateofBirth' in df.columns:
-        from src.data_models import format_date
-        df['DateofBirth'] = df['DateofBirth'].apply(lambda x: format_date(str(x)) if x else '')
+    # Format dates if the columns exist
+    from src.data_models import format_date
+    date_columns = ['DateofBirth', 'AdmissionDate']
+    for col in date_columns:
+        if col in df.columns:
+            df[col] = df[col].apply(lambda x: format_date(str(x)) if x else '')
     
     # Handle ClientFullName field if it exists
     if 'ClientFullName' in df.columns and not df['ClientFullName'].empty:

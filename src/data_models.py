@@ -85,21 +85,16 @@ def validate_zip(zip_str):
     else:
         return ""  # Invalid zip format
 
-def generate_admission_id(last_name, first_name, admission_date):
+def generate_admission_id(client_id):
     """
-    Generate a provider admission ID based on client name and admission date.
-    Format: Last4First1YYYYMMDD
+    Generate a provider admission ID based on client ID and current date.
+    Format: ClientID + "A" + current date (YYYYMMDD)
     
     Args:
-        last_name (str): Client's last name
-        first_name (str): Client's first name
-        admission_date (datetime): Admission date
+        client_id (str): Provider client ID
         
     Returns:
         str: Generated provider admission ID
     """
-    last_part = last_name[:4] if last_name else 'XXXX'
-    first_initial = first_name[0] if first_name else 'X'
-    date_str = admission_date.strftime("%Y%m%d")
-    
-    return f"{last_part}{first_initial}{date_str}"
+    date_str = datetime.now().strftime("%Y%m%d")
+    return f"{client_id}A{date_str}"

@@ -6,6 +6,8 @@ import pandas as pd
 from datetime import datetime
 from src.config import GENDER_OPTIONS, PROVIDERID, PROVIDERLOCATIONID
 from src.data_models import validate_date, validate_zip, generate_admission_id
+from src.survey_config import ADMISSION_SURVEY_QUESTIONS
+from src.utils.survey_engine import SurveyEngine
 
 def show_record_creation_page():
     """Display and handle the record creation UI."""
@@ -51,6 +53,10 @@ def show_client_admission_survey_form():
         st.session_state.selected_client_id = None
         st.session_state.selected_client_data = None
     
+    # Initialize session state for survey answers if not exists
+    if 'survey_answers' not in st.session_state:
+        st.session_state.survey_answers = {}
+    
     # Add radio button to choose between new client and existing client
     client_type = st.radio("Select Client Type", ["New Client", "Existing Client"], key="client_type")
     
@@ -92,127 +98,211 @@ def show_client_admission_survey_form():
         st.session_state.selected_client_id = None
         st.session_state.selected_client_data = None
     
-    with st.form("client_admission_form"):
-        st.subheader("Create Admission and Survey")
-        
-        # Client information
-        st.markdown("#### Client Information")
-        
-        if client_type == "Existing Client" and st.session_state.selected_client_data:
-            # Display client details
-            client_data = st.session_state.selected_client_data
-            st.markdown(f"**Provider Client ID:** {client_data['ProviderClientId']}")
-            st.markdown(f"**Name:** {client_data['FirstName']} {client_data['LastName']}")
-            st.markdown(f"**Date of Birth:** {client_data['DateofBirth']}")
-            st.markdown(f"**Gender:** {client_data['Gender']}")
-            st.markdown(f"**Zip Code:** {client_data['ZipCode']}")
+    # Create tabs for basic info and detailed survey
+    tab1, tab2 = st.tabs(["Basic Information", "Admission Survey"])
+    
+    with tab1:
+        with st.form("client_admission_form"):
+            st.subheader("Create Admission")
             
-            # Store values for form processing
-            client_id = client_data['ProviderClientId']
-            first_name = client_data['FirstName']
-            last_name = client_data['LastName']
-            date_of_birth = client_data['DateofBirth']
-            gender = client_data['Gender']
-            zip_code = client_data['ZipCode']
-        else:
-            # Show form fields for new client
-            col1, col2 = st.columns(2)
-            with col1:
-                client_id = st.text_input("Provider Client ID", help="Unique identifier for the client")
-                first_name = st.text_input("First Name")
-                date_of_birth = st.text_input("Date of Birth (MM/DD/YYYY)")
-            with col2:
-                last_name = st.text_input("Last Name")
-                gender = st.selectbox("Gender", options=list(GENDER_OPTIONS.keys()))
-                zip_code = st.text_input("Zip Code")
-        
-        # Admission information
-        st.markdown("#### Admission Information")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            admission_date = st.text_input("Admission Date (MM/DD/YYYY)")
-            admission_type = st.selectbox("Admission Type", options=["New", "Transfer", "Readmission"])
-        
-        # Survey information
-        st.markdown("#### Survey Information")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            housing = st.selectbox("Housing", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-            employment = st.selectbox("Employment", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-            alcohol = st.selectbox("Alcohol", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-            drug = st.selectbox("Drug", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-        
-        with col2:
-            legal = st.selectbox("Legal", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-            family = st.selectbox("Family", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-            medical = st.selectbox("Medical", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-            mental_health = st.selectbox("Mental Health", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
-        
-        submit_button = st.form_submit_button("Create Records")
-        
-        if submit_button:
-            if not validate_date(admission_date):
-                st.error("Please enter a valid admission date in MM/DD/YYYY format.")
-                return
+            # Client information
+            st.markdown("#### Client Information")
+            
+            if client_type == "Existing Client" and st.session_state.selected_client_data:
+                # Display client details
+                client_data = st.session_state.selected_client_data
+                st.markdown(f"**Provider Client ID:** {client_data['ProviderClientId']}")
+                st.markdown(f"**Name:** {client_data['FirstName']} {client_data['LastName']}")
+                st.markdown(f"**Date of Birth:** {client_data['DateofBirth']}")
+                st.markdown(f"**Gender:** {client_data['Gender']}")
+                st.markdown(f"**Zip Code:** {client_data['ZipCode']}")
                 
-            # Only validate date of birth for new clients
-            if client_type == "New Client":
-                if not validate_date(date_of_birth):
-                    st.error("Please enter a valid date of birth in MM/DD/YYYY format.")
+                # Store values for form processing
+                client_id = client_data['ProviderClientId']
+                first_name = client_data['FirstName']
+                last_name = client_data['LastName']
+                date_of_birth = client_data['DateofBirth']
+                gender = client_data['Gender']
+                zip_code = client_data['ZipCode']
+            else:
+                # Show form fields for new client
+                col1, col2 = st.columns(2)
+                with col1:
+                    client_id = st.text_input("Provider Client ID", help="Unique identifier for the client")
+                    first_name = st.text_input("First Name")
+                    date_of_birth = st.text_input("Date of Birth (MM/DD/YYYY)")
+                with col2:
+                    last_name = st.text_input("Last Name")
+                    gender = st.selectbox("Gender", options=list(GENDER_OPTIONS.keys()))
+                    zip_code = st.text_input("Zip Code")
+            
+            # Admission information
+            st.markdown("#### Admission Information")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Get admission date from client data if available
+                default_admission_date = ""
+                if client_type == "Existing Client" and st.session_state.selected_client_data:
+                    # Try to get admission date from admissions DataFrame
+                    client_admissions = st.session_state.admissions_df[
+                        st.session_state.admissions_df['ProviderClientId'] == client_id
+                    ]
+                    if not client_admissions.empty and 'AdmissionDate' in client_admissions.columns:
+                        default_admission_date = client_admissions.iloc[-1]['AdmissionDate']
+                
+                admission_date = st.text_input("Admission Date (MM/DD/YYYY)", value=default_admission_date)
+                admission_type = st.selectbox("Admission Type", options=["New", "Transfer", "Readmission"])
+            
+            # Basic survey information (still keeping it for backward compatibility)
+            st.markdown("#### Basic Assessment")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                housing = st.selectbox("Housing", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
+                employment = st.selectbox("Employment", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
+                alcohol = st.selectbox("Alcohol", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
+                drug = st.selectbox("Drug", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
+            
+            with col2:
+                legal = st.selectbox("Legal", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
+                family = st.selectbox("Family", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
+                medical = st.selectbox("Medical", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
+                mental_health = st.selectbox("Mental Health", options=["No Issue", "Minor Issue", "Moderate Issue", "Severe Issue"])
+            
+            submit_button = st.form_submit_button("Create Basic Records")
+            
+            if submit_button:
+                if not validate_date(admission_date):
+                    st.error("Please enter a valid admission date in MM/DD/YYYY format.")
                     return
                     
-                # Create client record
-                new_client = {
+                # Only validate date of birth for new clients
+                if client_type == "New Client":
+                    if not validate_date(date_of_birth):
+                        st.error("Please enter a valid date of birth in MM/DD/YYYY format.")
+                        return
+                        
+                    # Create client record
+                    new_client = {
+                        "ProviderClientId": client_id,
+                        "FirstName": first_name,
+                        "LastName": last_name,
+                        "DateofBirth": date_of_birth,
+                        "Gender": gender,
+                        "ZipCode": validate_zip(zip_code)
+                    }
+                
+                # Generate admission ID
+                admission_id = generate_admission_id(client_id)
+                
+                # Create admission record
+                new_admission = {
+                    "ProviderId": PROVIDERID,
                     "ProviderClientId": client_id,
-                    "FirstName": first_name,
-                    "LastName": last_name,
-                "DateofBirth": date_of_birth,
-                "Gender": gender,
-                "ZipCode": validate_zip(zip_code)
-            }
+                    "ProviderAdmissionId": admission_id,
+                    "AdmissionDate": admission_date,
+                    "AdmissionType": admission_type,
+                    "ProviderLocationId": PROVIDERLOCATIONID
+                }
+                
+                # Create basic survey record
+                new_survey = {
+                    "ProviderId": PROVIDERID,
+                    "ProviderClientId": client_id,
+                    "ProviderAdmissionId": admission_id,
+                    "SurveyDate": admission_date,
+                    "Housing": housing,
+                    "Employment": employment,
+                    "Alcohol": alcohol,
+                    "Drug": drug,
+                    "Legal": legal,
+                    "Family": family,
+                    "Medical": medical,
+                    "MentalHealth": mental_health
+                }
+                
+                # Add records to DataFrames
+                if client_type == "New Client":
+                    st.session_state.clients_df = pd.concat([st.session_state.clients_df, pd.DataFrame([new_client])], ignore_index=True)
+                
+                st.session_state.admissions_df = pd.concat([st.session_state.admissions_df, pd.DataFrame([new_admission])], ignore_index=True)
+                st.session_state.survey_df = pd.concat([st.session_state.survey_df, pd.DataFrame([new_survey])], ignore_index=True)
+                
+                # Store admission ID in session state for survey tab
+                st.session_state.current_admission_id = admission_id
+                st.session_state.current_client_id = client_id
+                
+                if client_type == "New Client":
+                    st.success(f"Successfully created client and admission records for {first_name} {last_name}. Please complete the admission survey.")
+                else:
+                    st.success(f"Successfully created admission record for {first_name} {last_name}. Please complete the admission survey.")
+                
+                # Switch to survey tab
+                st.experimental_set_query_params(active_tab="Admission Survey")
+    
+    with tab2:
+        st.subheader("Admission Survey Questions")
+        
+        # Check if we have a current admission to work with
+        if hasattr(st.session_state, 'current_admission_id') and st.session_state.current_admission_id:
+            admission_id = st.session_state.current_admission_id
+            client_id = st.session_state.current_client_id
             
-            # Generate admission ID
-            admission_id = f"{client_id}A{datetime.now().strftime('%Y%m%d')}"
+            # Display current admission ID
+            st.info(f"Completing survey for Admission ID: {admission_id}")
             
-            # Create admission record
-            new_admission = {
-                "ProviderId": PROVIDERID,
-                "ProviderClientId": client_id,
-                "ProviderAdmissionId": admission_id,
-                "AdmissionDate": admission_date,
-                "AdmissionType": admission_type,
-                "ProviderLocationId": PROVIDERLOCATIONID
-            }
+            # Create survey engine with the questions
+            survey_engine = SurveyEngine(ADMISSION_SURVEY_QUESTIONS)
             
-            # Create survey record
-            new_survey = {
-                "ProviderId": PROVIDERID,
-                "ProviderClientId": client_id,
-                "ProviderAdmissionId": admission_id,
-                "SurveyDate": admission_date,
-                "Housing": housing,
-                "Employment": employment,
-                "Alcohol": alcohol,
-                "Drug": drug,
-                "Legal": legal,
-                "Family": family,
-                "Medical": medical,
-                "MentalHealth": mental_health
-            }
+            # Load existing answers if any
+            if 'survey_answers' in st.session_state and admission_id in st.session_state.survey_answers:
+                survey_engine.answers = st.session_state.survey_answers[admission_id]
             
-            # Add records to DataFrames
-            if client_type == "New Client":
-                st.session_state.clients_df = pd.concat([st.session_state.clients_df, pd.DataFrame([new_client])], ignore_index=True)
-            
-            st.session_state.admissions_df = pd.concat([st.session_state.admissions_df, pd.DataFrame([new_admission])], ignore_index=True)
-            st.session_state.survey_df = pd.concat([st.session_state.survey_df, pd.DataFrame([new_survey])], ignore_index=True)
-            
-            if client_type == "New Client":
-                st.success(f"Successfully created client, admission, and survey records for {first_name} {last_name}.")
-            else:
-                st.success(f"Successfully created admission and survey records for {first_name} {last_name}.")
+            # Render the survey form
+            with st.form("admission_survey_form"):
+                survey_answers = survey_engine.render_survey_form()
+                
+                submit_survey = st.form_submit_button("Submit Survey")
+                
+                if submit_survey:
+                    # Validate all answers
+                    if survey_engine.validate_all():
+                        # Get formatted answers
+                        formatted_answers = survey_engine.get_formatted_answers()
+                        
+                        # Store answers in session state
+                        if 'survey_answers' not in st.session_state:
+                            st.session_state.survey_answers = {}
+                        
+                        st.session_state.survey_answers[admission_id] = formatted_answers
+                        
+                        # Create survey answers dataframe
+                        survey_data = {
+                            "ProviderId": PROVIDERID,
+                            "ProviderClientId": client_id,
+                            "ProviderAdmissionId": admission_id,
+                            "SurveyDate": datetime.now().strftime("%m/%d/%Y")
+                        }
+                        
+                        # Add all survey answers to the data
+                        for seq_num, value in formatted_answers.items():
+                            survey_data[f"Question_{seq_num}"] = value
+                        
+                        # Add to detailed survey dataframe
+                        if 'detailed_survey_df' not in st.session_state:
+                            st.session_state.detailed_survey_df = pd.DataFrame()
+                        
+                        st.session_state.detailed_survey_df = pd.concat([
+                            st.session_state.detailed_survey_df, 
+                            pd.DataFrame([survey_data])
+                        ], ignore_index=True)
+                        
+                        st.success("Successfully saved admission survey data.")
+                    else:
+                        st.error("Please correct the errors in the survey before submitting.")
+        else:
+            st.warning("Please create an admission record first in the Basic Information tab.")
 
 def show_discharge_form():
     """Display and handle the discharge form."""

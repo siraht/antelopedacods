@@ -43,5 +43,14 @@ FIELD_MAPPING = {
     "zipcode": "ZipCode",
     "zip code": "ZipCode",
     "postal code": "ZipCode",
-    "postalcode": "ZipCode"
+    "postalcode": "ZipCode",
+    # Admission date mappings
+    "admission date": "AdmissionDate",
+    "admissiondate": "AdmissionDate",
+    "admit date": "AdmissionDate",
+    "admitdate": "AdmissionDate",
+    "date admitted": "AdmissionDate",
+    "dateadmitted": "AdmissionDate",
+    "admission for state": "AdmissionDate",
+    "admissionforstate": "AdmissionDate"
 }
