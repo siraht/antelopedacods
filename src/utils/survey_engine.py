@@ -21,6 +21,49 @@ class SurveyEngine:
         self.answers = {}
         self.errors = {}
         
+    def import_json_answers(self, json_str):
+        """
+        Import survey answers from a JSON string.
+        
+        Args:
+            json_str (str): JSON string containing survey answers
+            
+        Returns:
+            tuple: (success, message) - success is True if import was successful, message contains error or success info
+        """
+        try:
+            # Parse JSON string
+            data = json.loads(json_str)
+            
+            # Validate the data structure - should be a dictionary of sequence numbers to values
+            if not isinstance(data, dict):
+                return False, "Invalid JSON structure. Expected a dictionary of question numbers to values."
+            
+            # Validate sequence numbers
+            valid_seq_nums = [q["sequence_number"] for q in self.questions]
+            
+            # Check sequence numbers and data types
+            for seq_num, value in data.items():
+                # Check if sequence number exists in questions
+                if seq_num not in valid_seq_nums:
+                    return False, f"Unknown question sequence number: {seq_num}"
+                
+                # All values should be strings for consistency
+                data[seq_num] = str(value) if value is not None else ""
+            
+            # Import valid answers
+            self.answers.update(data)
+            
+            # Validate imported answers
+            self.validate_cross_field()  # Apply cross-field validation rules
+            
+            return True, f"Successfully imported {len(data)} survey answers."
+        
+        except json.JSONDecodeError:
+            return False, "Invalid JSON format. Please check your input."
+        except Exception as e:
+            return False, f"Error importing JSON: {str(e)}"
+        
     def evaluate_rule(self, rule, value):
         """
         Evaluate a rule to determine if it applies.
@@ -407,3 +450,18 @@ class SurveyEngine:
                 formatted[seq_num] = value
                 
         return formatted
+    
+    def export_answers_as_json(self, pretty=True):
+        """
+        Export current answers as a formatted JSON string.
+        
+        Args:
+            pretty (bool): Whether to format the JSON with indentation for readability
+            
+        Returns:
+            str: JSON string of answers
+        """
+        if pretty:
+            return json.dumps(self.answers, indent=2)
+        else:
+            return json.dumps(self.answers)

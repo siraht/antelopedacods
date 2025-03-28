@@ -20,8 +20,9 @@ def show_record_creation_page():
         # Initialize DataFrames if not exist
         if "admissions_df" not in st.session_state:
             st.session_state.admissions_df = pd.DataFrame(columns=[
-                "ProviderId", "ProviderClientId", "ProviderAdmissionId", "AdmissionDate", 
-                "AdmissionType", "ProviderLocationId"
+                "ProviderId", "ProviderClientId", "ProviderAdmissionId", "ProviderLocationId",
+                "AdmissionDate", "AdmissionType", "ServiceLevel", "ServiceCode", 
+                "DefaultPayerAccountID", "ReferralNumber", "PrimaryClinicianName", "FirstContactDate"
             ])
             
         if "discharges_df" not in st.session_state:
@@ -270,6 +271,44 @@ def show_client_admission_survey_form():
             # Load existing answers if any
             if 'survey_answers' in st.session_state and admission_id in st.session_state.survey_answers:
                 survey_engine.answers = st.session_state.survey_answers[admission_id]
+            
+            # Add JSON import/export section above the form
+            with st.expander("Import/Export JSON Survey Data"):
+                # Two columns for import and export
+                import_col, export_col = st.columns(2)
+                
+                # Import functionality
+                with import_col:
+                    st.subheader("Import JSON Data")
+                    json_input = st.text_area("Paste JSON survey data here", height=200,
+                                            help="Paste a JSON object with question sequence numbers as keys and answers as values.")
+                    import_button = st.button("Import Data")
+                    
+                    if import_button and json_input:
+                        success, message = survey_engine.import_json_answers(json_input)
+                        if success:
+                            st.success(message)
+                            # Update session state with imported answers
+                            if 'survey_answers' not in st.session_state:
+                                st.session_state.survey_answers = {}
+                            st.session_state.survey_answers[admission_id] = survey_engine.answers
+                        else:
+                            st.error(message)
+                
+                # Export functionality
+                with export_col:
+                    st.subheader("Export Current Data")
+                    if survey_engine.answers:
+                        export_json = survey_engine.export_answers_as_json()
+                        st.code(export_json, language="json")
+                        st.download_button(
+                            label="Download JSON",
+                            data=export_json,
+                            file_name=f"survey_answers_{admission_id}.json",
+                            mime="application/json"
+                        )
+                    else:
+                        st.info("No survey data available to export.")
             
             # Create form for survey
             with st.form("admission_survey_form"):

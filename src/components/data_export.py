@@ -26,14 +26,46 @@ def format_admissions_for_export():
         "ProviderId": admissions_df["ProviderId"],
         "ProviderClientId": admissions_df["ProviderClientId"],
         "ProviderAdmissionId": admissions_df["ProviderAdmissionId"],
-        "ProviderLocationId": admissions_df["ProviderLocationId"],
-        "ServiceCode": [SERVICE_CODE_MAPPING.get(DEFAULT_SERVICE_LEVEL)] * len(admissions_df),
-        "DefaultPayerAccountID": [DEFAULT_PAYER_ACCOUNT_ID] * len(admissions_df),
-        "ReferralNumber": [""] * len(admissions_df),
-        "AdmissionDate": admissions_df["AdmissionDate"],
-        "PrimaryClinicianName": [DEFAULT_PRIMARY_CLINICIAN] * len(admissions_df),
-        "FirstContactDate": admissions_df["AdmissionDate"]  # Use admission date as first contact date
+        "ProviderLocationId": admissions_df["ProviderLocationId"]
     }
+    
+    # Add ServiceCode - use the one from the record if available, otherwise use mapping
+    if "ServiceCode" in admissions_df.columns:
+        export_data["ServiceCode"] = admissions_df["ServiceCode"]
+    elif "ServiceLevel" in admissions_df.columns:
+        # Map service level to service code
+        export_data["ServiceCode"] = admissions_df["ServiceLevel"].apply(
+            lambda x: SERVICE_CODE_MAPPING.get(x, SERVICE_CODE_MAPPING.get(DEFAULT_SERVICE_LEVEL, ""))
+        )
+    else:
+        export_data["ServiceCode"] = [SERVICE_CODE_MAPPING.get(DEFAULT_SERVICE_LEVEL, "")] * len(admissions_df)
+    
+    # Add DefaultPayerAccountID
+    if "DefaultPayerAccountID" in admissions_df.columns:
+        export_data["DefaultPayerAccountID"] = admissions_df["DefaultPayerAccountID"]
+    else:
+        export_data["DefaultPayerAccountID"] = [DEFAULT_PAYER_ACCOUNT_ID] * len(admissions_df)
+    
+    # Add ReferralNumber
+    if "ReferralNumber" in admissions_df.columns:
+        export_data["ReferralNumber"] = admissions_df["ReferralNumber"]
+    else:
+        export_data["ReferralNumber"] = [""] * len(admissions_df)
+    
+    # Add AdmissionDate
+    export_data["AdmissionDate"] = admissions_df["AdmissionDate"]
+    
+    # Add PrimaryClinicianName
+    if "PrimaryClinicianName" in admissions_df.columns:
+        export_data["PrimaryClinicianName"] = admissions_df["PrimaryClinicianName"]
+    else:
+        export_data["PrimaryClinicianName"] = [DEFAULT_PRIMARY_CLINICIAN] * len(admissions_df)
+    
+    # Add FirstContactDate
+    if "FirstContactDate" in admissions_df.columns:
+        export_data["FirstContactDate"] = admissions_df["FirstContactDate"]
+    else:
+        export_data["FirstContactDate"] = admissions_df["AdmissionDate"]  # Use admission date as fallback
     
     # Create dataframe from export data
     export_df = pd.DataFrame(export_data)
