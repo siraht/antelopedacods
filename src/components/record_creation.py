@@ -272,8 +272,11 @@ def show_client_admission_survey_form():
             if 'survey_answers' in st.session_state and admission_id in st.session_state.survey_answers:
                 survey_engine.answers = st.session_state.survey_answers[admission_id]
             
-            # Add JSON import/export section above the form
-            with st.expander("Import/Export JSON Survey Data"):
+            # Create tabs for different sections
+            survey_form_tab, survey_data_tab, export_tab = st.tabs(["Survey Form", "Import/Export", "All Survey Data"])
+            
+            # Survey data tab
+            with survey_data_tab:
                 # Two columns for import and export
                 import_col, export_col = st.columns(2)
                 
@@ -299,6 +302,7 @@ def show_client_admission_survey_form():
                 with export_col:
                     st.subheader("Export Current Data")
                     if survey_engine.answers:
+                        # JSON export for individual survey
                         export_json = survey_engine.export_answers_as_json()
                         st.code(export_json, language="json")
                         st.download_button(
@@ -307,16 +311,55 @@ def show_client_admission_survey_form():
                             file_name=f"survey_answers_{admission_id}.json",
                             mime="application/json"
                         )
+                        
+                        # CSV export for all survey data
+                        if 'survey_df' in st.session_state and not st.session_state.survey_df.empty:
+                            csv_data = st.session_state.survey_df.to_csv(index=False)
+                            st.download_button(
+                                label="Download All Survey Data (CSV)",
+                                data=csv_data,
+                                file_name="survey_data.csv",
+                                mime="text/csv"
+                            )
                     else:
                         st.info("No survey data available to export.")
             
-            # Create form for survey
-            with st.form("admission_survey_form"):
-                # Render the survey questions
-                survey_engine.render_survey_form()
+            # Export all data tab
+            with export_tab:
+                st.subheader("Export All Survey Data")
                 
-                # Add submit button at the end of the form
-                submit_survey = st.form_submit_button("Submit Survey")
+                # Show all survey data
+                if 'survey_df' in st.session_state and not st.session_state.survey_df.empty:
+                    st.write(f"Total survey records: {len(st.session_state.survey_df)}")
+                    st.dataframe(st.session_state.survey_df)
+                    
+                    # Export all survey data
+                    csv_data = st.session_state.survey_df.to_csv(index=False)
+                    st.download_button(
+                        label="Download All Survey Data (CSV)",
+                        data=csv_data,
+                        file_name="all_survey_data.csv",
+                        mime="text/csv",
+                        key="download_all_survey_data"
+                    )
+                    
+                    # Add a button to clear all survey data
+                    if st.button("Clear All Survey Data"):
+                        st.session_state.survey_df = pd.DataFrame()
+                        st.success("All survey data cleared.")
+                        st.rerun()
+                else:
+                    st.info("No survey data available to export.")
+            
+            # Survey form tab
+            with survey_form_tab:
+                # Create form for survey
+                with st.form("admission_survey_form"):
+                    # Render the survey questions
+                    survey_engine.render_survey_form()
+                    
+                    # Add submit button at the end of the form
+                    submit_survey = st.form_submit_button("Submit Survey")
                 
                 # Check if form was submitted
                 if submit_survey:
@@ -334,28 +377,47 @@ def show_client_admission_survey_form():
                         
                         st.session_state.survey_answers[admission_id] = formatted_answers
                         
-                        # Create survey answers dataframe
-                        survey_data = {
-                            "ProviderId": PROVIDERID,
-                            "ProviderClientId": client_id,
-                            "ProviderAdmissionId": admission_id,
-                            "SurveyDate": datetime.now().strftime("%m/%d/%Y")
-                        }
+                        # Create survey answers dataframe in the correct format (one row per question)
+                        survey_rows = []
                         
-                        # Add all survey answers to the data
                         for seq_num, value in formatted_answers.items():
-                            survey_data[f"Question_{seq_num}"] = value
+                            # Skip empty answers
+                            if value == "":
+                                continue
+                                
+                            survey_row = {
+                                "RecordType": "SurAns",
+                                "ProviderId": PROVIDERID,
+                                "ProviderClientId": client_id,
+                                "ProviderAdmissionId": admission_id,
+                                "QuestionGroupId": "1",  # 1 for Admission
+                                "ExportSequenceNumber": seq_num,
+                                "AnswerValue": value
+                            }
+                            survey_rows.append(survey_row)
                         
-                        # Add to detailed survey dataframe
-                        if 'detailed_survey_df' not in st.session_state:
-                            st.session_state.detailed_survey_df = pd.DataFrame()
+                        # Add to survey dataframe
+                        if 'survey_df' not in st.session_state:
+                            st.session_state.survey_df = pd.DataFrame()
                         
-                        st.session_state.detailed_survey_df = pd.concat([
-                            st.session_state.detailed_survey_df, 
-                            pd.DataFrame([survey_data])
-                        ], ignore_index=True)
+                        if survey_rows:  # Only add if there are answers
+                            st.session_state.survey_df = pd.concat([
+                                st.session_state.survey_df, 
+                                pd.DataFrame(survey_rows)
+                            ], ignore_index=True)
                         
-                        st.success("Successfully saved admission survey data.")
+                        # Show success message with count of questions answered
+                        st.success(f"Successfully saved {len(survey_rows)} survey answers.")
+                        
+                        # Display the survey data
+                        if 'survey_df' in st.session_state and not st.session_state.survey_df.empty:
+                            with st.expander("View Saved Survey Data"):
+                                # Filter to show only this admission's data
+                                admission_data = st.session_state.survey_df[
+                                    st.session_state.survey_df["ProviderAdmissionId"] == admission_id
+                                ]
+                                if not admission_data.empty:
+                                    st.dataframe(admission_data)
                     else:
                         # Show all validation errors
                         st.error("Please correct the following errors:")
