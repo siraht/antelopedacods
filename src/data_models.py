@@ -85,16 +85,45 @@ def validate_zip(zip_str):
     else:
         return ""  # Invalid zip format
 
-def generate_admission_id(client_id):
+def generate_admission_id(client_id, first_name=None, last_name=None, admission_date=None):
     """
-    Generate a provider admission ID based on client ID and current date.
-    Format: ClientID + "A" + current date (YYYYMMDD)
+    Generate a provider admission ID based on client info and admission date.
+    Format: Alphanumeric ID using name initials and date, max 15 characters
     
     Args:
         client_id (str): Provider client ID
+        first_name (str, optional): Client's first name
+        last_name (str, optional): Client's last name
+        admission_date (str, optional): Admission date in MM/DD/YYYY format
         
     Returns:
-        str: Generated provider admission ID
+        str: Generated provider admission ID, no longer than 15 characters
     """
-    date_str = datetime.now().strftime("%Y%m%d")
-    return f"{client_id}A{date_str}"
+    # Get initials if names are provided
+    initials = ""
+    if first_name and last_name:
+        initials = (first_name[0] + last_name[0]).upper()
+    
+    # Format the date part - either from admission date or current date
+    if admission_date and validate_date(admission_date):
+        try:
+            # Try to parse the admission date
+            date_obj = datetime.strptime(admission_date, "%m/%d/%Y")
+            date_str = date_obj.strftime("%y%m%d")  # Short year format (2 digits)
+        except ValueError:
+            # If parsing fails, use current date
+            date_str = datetime.now().strftime("%y%m%d")
+    else:
+        # Use current date if no admission date is provided
+        date_str = datetime.now().strftime("%y%m%d")
+    
+    # Create ID with parts: ADM + last 4 of client ID + initials + date
+    # Make sure the total is not more than 15 characters
+    client_id_part = str(client_id)[-4:] if client_id else ""
+    admission_id = f"ADM{client_id_part}{initials}{date_str}"
+    
+    # Ensure it's no longer than 15 characters
+    if len(admission_id) > 15:
+        admission_id = admission_id[:15]
+    
+    return admission_id

@@ -138,21 +138,64 @@ def show_client_admission_survey_form():
             
             # Admission information
             st.markdown("#### Admission Information")
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             
             with col1:
                 # Get admission date from client data if available
                 default_admission_date = ""
                 if client_type == "Existing Client" and st.session_state.selected_client_data:
-                    # Try to get admission date from admissions DataFrame
-                    client_admissions = st.session_state.admissions_df[
-                        st.session_state.admissions_df['ProviderClientId'] == client_id
-                    ]
-                    if not client_admissions.empty and 'AdmissionDate' in client_admissions.columns:
-                        default_admission_date = client_admissions.iloc[-1]['AdmissionDate']
+                    client_id = st.session_state.selected_client_data['ProviderClientId']
+                    
+                    # Check directly in the selected client data first
+                    if 'AdmissionDate' in st.session_state.selected_client_data:
+                        default_admission_date = st.session_state.selected_client_data['AdmissionDate']
+                    
+                    # If not found, try to get admission date from admissions DataFrame
+                    elif 'admissions_df' in st.session_state and not st.session_state.admissions_df.empty:
+                        # Force client ID to string for comparison
+                        # Use the isin method for more reliable matching
+                        mask = st.session_state.admissions_df['ProviderClientId'].astype(str).isin([str(client_id)])
+                        client_admissions = st.session_state.admissions_df[mask]
+                        
+                        if not client_admissions.empty and 'AdmissionDate' in client_admissions.columns:
+                            # Sort by admission date to get the most recent
+                            try:
+                                # Try to convert to datetime for sorting
+                                client_admissions['AdmissionDateSort'] = pd.to_datetime(client_admissions['AdmissionDate'], errors='coerce')
+                                client_admissions = client_admissions.sort_values('AdmissionDateSort', ascending=False)
+                            except:
+                                # If conversion fails, just use the last row
+                                pass
+                                
+                            # Get admission date from the most recent record
+                            default_admission_date = client_admissions.iloc[0]['AdmissionDate']
                 
+                # First contact date (default to admission date)
                 admission_date = st.text_input("Admission Date (MM/DD/YYYY)", value=default_admission_date)
+                first_contact_date = st.text_input("First Contact Date (MM/DD/YYYY)", value=default_admission_date)
                 admission_type = st.selectbox("Admission Type", options=["New", "Transfer", "Readmission"])
+                
+            with col2:
+                # Import service code mapping from config
+                from src.config import SERVICE_CODE_MAPPING, DEFAULT_SERVICE_LEVEL, DEFAULT_PAYER_ACCOUNT_ID
+                
+                # Service level dropdown (OP or IOP)
+                service_level = st.selectbox(
+                    "Service Level", 
+                    options=list(SERVICE_CODE_MAPPING.keys()),
+                    index=list(SERVICE_CODE_MAPPING.keys()).index(DEFAULT_SERVICE_LEVEL) if DEFAULT_SERVICE_LEVEL in SERVICE_CODE_MAPPING else 0
+                )
+                
+                # Payer account ID
+                payer_account_id = st.text_input("Payer Account ID", value=DEFAULT_PAYER_ACCOUNT_ID)
+                referral_number = st.text_input("Referral Number (Optional)")
+                
+            with col3:
+                # Import default clinician from config
+                from src.config import DEFAULT_PRIMARY_CLINICIAN
+                
+                # Primary clinician
+                primary_clinician = st.text_input("Primary Clinician", value=DEFAULT_PRIMARY_CLINICIAN)
             
             # Basic survey information (still keeping it for backward compatibility)
             st.markdown("#### Basic Assessment")
@@ -193,17 +236,23 @@ def show_client_admission_survey_form():
                         "ZipCode": validate_zip(zip_code)
                     }
                 
-                # Generate admission ID
-                admission_id = generate_admission_id(client_id)
+                # Generate admission ID with client name and admission date
+                admission_id = generate_admission_id(client_id, first_name, last_name, admission_date)
                 
-                # Create admission record
+                # Create admission record with all required fields
                 new_admission = {
                     "ProviderId": PROVIDERID,
                     "ProviderClientId": client_id,
                     "ProviderAdmissionId": admission_id,
+                    "ProviderLocationId": PROVIDERLOCATIONID,
                     "AdmissionDate": admission_date,
                     "AdmissionType": admission_type,
-                    "ProviderLocationId": PROVIDERLOCATIONID
+                    "ServiceLevel": service_level,
+                    "ServiceCode": SERVICE_CODE_MAPPING.get(service_level),
+                    "DefaultPayerAccountID": payer_account_id,
+                    "ReferralNumber": referral_number,
+                    "PrimaryClinicianName": primary_clinician,
+                    "FirstContactDate": first_contact_date
                 }
                 
                 # Create basic survey record
@@ -239,7 +288,7 @@ def show_client_admission_survey_form():
                     st.success(f"Successfully created admission record for {first_name} {last_name}. Please complete the admission survey.")
                 
                 # Switch to survey tab
-                st.experimental_set_query_params(active_tab="Admission Survey")
+                st.query_params.update(active_tab="Admission Survey")
     
     with tab2:
         st.subheader("Admission Survey Questions")
@@ -259,10 +308,12 @@ def show_client_admission_survey_form():
             if 'survey_answers' in st.session_state and admission_id in st.session_state.survey_answers:
                 survey_engine.answers = st.session_state.survey_answers[admission_id]
             
-            # Render the survey form
+            # Create form for survey
             with st.form("admission_survey_form"):
-                survey_answers = survey_engine.render_survey_form()
+                # Render the survey questions
+                survey_engine.render_survey_form()
                 
+                # Add submit button at the end of the form
                 submit_survey = st.form_submit_button("Submit Survey")
                 
                 if submit_survey:

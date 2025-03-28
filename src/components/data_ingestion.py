@@ -19,17 +19,33 @@ def show_data_ingestion_page():
     # Process the uploaded data
     if uploaded_file is not None:
         try:
-            clients_df = process_csv_data(uploaded_file)
-            st.success(f"CSV file successfully loaded with {len(clients_df)} records.")
+            # Process the file to get both client and admission data
+            clients_df, admissions_df = process_csv_data(uploaded_file)
+            
+            # Update session state with client data
             st.session_state.clients_df = clients_df
+            st.success(f"CSV file successfully loaded with {len(clients_df)} client records.")
+            
+            # Update session state with admission data if available
+            if not admissions_df.empty:
+                st.session_state.admissions_df = admissions_df
+                st.success(f"Also extracted {len(admissions_df)} admission records from the CSV.")
         except Exception as e:
             st.error(f"Error loading CSV file: {e}")
 
     # Process the TSV text input
     if tsv_text:
         try:
-            clients_df = process_tsv_data(tsv_text)
-            st.success(f"TSV data successfully loaded with {len(clients_df)} records.")
+            # Process the TSV to get both client and admission data
+            clients_df, admissions_df = process_tsv_data(tsv_text)
+            
+            # Update session state with client data
             st.session_state.clients_df = clients_df
+            st.success(f"TSV data successfully loaded with {len(clients_df)} client records.")
+            
+            # Update session state with admission data if available
+            if not admissions_df.empty:
+                st.session_state.admissions_df = admissions_df
+                st.success(f"Also extracted {len(admissions_df)} admission records from the TSV.")
         except Exception as e:
             st.error(f"Error parsing TSV data: {e}")

@@ -6,6 +6,21 @@ Configuration settings and constants for the application.
 PROVIDERID = "ABC123"
 PROVIDERLOCATIONID = "LOC001"
 
+# Service code mappings
+SERVICE_CODE_MAPPING = {
+    "OP": "asam-1",
+    "IOP": "asam-2.1"
+}
+
+# Default service level
+DEFAULT_SERVICE_LEVEL = ""
+
+# Default payer account ID
+DEFAULT_PAYER_ACCOUNT_ID = ""
+
+# Default primary clinician
+DEFAULT_PRIMARY_CLINICIAN = ""
+
 # Gender options for dropdown
 GENDER_OPTIONS = {
     "Male": 1,

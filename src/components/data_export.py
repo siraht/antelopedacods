@@ -3,6 +3,43 @@ Data export component for downloading client data as CSV files.
 """
 import streamlit as st
 
+def format_admissions_for_export():
+    """
+    Format admissions data for export according to the required specifications.
+    
+    Returns:
+        pd.DataFrame: Formatted admissions dataframe ready for export
+    """
+    import pandas as pd
+    from datetime import datetime
+    from src.config import (
+        PROVIDERID, PROVIDERLOCATIONID, SERVICE_CODE_MAPPING,
+        DEFAULT_SERVICE_LEVEL, DEFAULT_PAYER_ACCOUNT_ID, DEFAULT_PRIMARY_CLINICIAN
+    )
+    
+    # Create a copy of the admissions dataframe
+    admissions_df = st.session_state.admissions_df.copy()
+    
+    # Create a new dataframe with the required fields
+    export_data = {
+        "RecordType": ["Admission"] * len(admissions_df),
+        "ProviderId": admissions_df["ProviderId"],
+        "ProviderClientId": admissions_df["ProviderClientId"],
+        "ProviderAdmissionId": admissions_df["ProviderAdmissionId"],
+        "ProviderLocationId": admissions_df["ProviderLocationId"],
+        "ServiceCode": [SERVICE_CODE_MAPPING.get(DEFAULT_SERVICE_LEVEL)] * len(admissions_df),
+        "DefaultPayerAccountID": [DEFAULT_PAYER_ACCOUNT_ID] * len(admissions_df),
+        "ReferralNumber": [""] * len(admissions_df),
+        "AdmissionDate": admissions_df["AdmissionDate"],
+        "PrimaryClinicianName": [DEFAULT_PRIMARY_CLINICIAN] * len(admissions_df),
+        "FirstContactDate": admissions_df["AdmissionDate"]  # Use admission date as first contact date
+    }
+    
+    # Create dataframe from export data
+    export_df = pd.DataFrame(export_data)
+    
+    return export_df
+
 def show_data_export_page():
     """Display and handle the data export UI."""
     st.header("Data Export")
@@ -27,9 +64,12 @@ def show_data_export_page():
     # Admissions data export
     with col2:
         if "admissions_df" in st.session_state and not st.session_state.admissions_df.empty:
+            # Format admissions for export
+            export_admissions_df = format_admissions_for_export()
+            
             st.download_button(
                 label="Download Admissions",
-                data=st.session_state.admissions_df.to_csv(index=False),
+                data=export_admissions_df.to_csv(index=False),
                 file_name="admissions.csv",
                 mime="text/csv"
             )

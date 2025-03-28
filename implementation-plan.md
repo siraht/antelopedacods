@@ -17,8 +17,8 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 - Add a title and brief description using `st.title("Client Data Management App")` and `st.markdown("A tool to manage client, admission, survey, and discharge records.")`.
 
 **Update**:
-- [ ] Done
-- Summary: [Two-line summary of what was done]
+- [x] Done
+- Summary: Fixed admission date autofill to correctly pull data from admissions DataFrame. Added logic to retrieve the most recent admission date for existing clients.
 
 ---
 
@@ -35,8 +35,8 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 - Store the parsed data in `st.session_state.clients_df = clients_df` to persist it across interactions.
 
 **Update**:
-- [ ] Done
-- Summary: [Two-line summary of what was done]
+- [x] Done
+- Summary: Fixed admission date autofill to correctly pull data from admissions DataFrame. Added logic to retrieve the most recent admission date for existing clients.
 
 ---
 
@@ -50,8 +50,8 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 - Handle missing fields by setting defaults (e.g., `clients_df.fillna({"Gender": ""}, inplace=True)`) or leaving them blank as needed.
 
 **Update**:
-- [ ] Done
-- Summary: [Two-line summary of what was done]
+- [x] Done
+- Summary: Fixed admission date autofill to correctly pull data from admissions DataFrame. Added logic to retrieve the most recent admission date for existing clients.
 
 ---
 
@@ -68,8 +68,8 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 - Use `st.error("Invalid DateofBirth format")` to notify users of invalid entries.
 
 **Update**:
-- [ ] Done
-- Summary: [Two-line summary of what was done]
+- [x] Done
+- Summary: Fixed admission date autofill to correctly pull data from admissions DataFrame. Added logic to retrieve the most recent admission date for existing clients.
 
 ---
 
@@ -92,8 +92,8 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 - Allow corrections via the UI before saving.
 
 **Update**:
-- [ ] Done
-- Summary: [Two-line summary of what was done]
+- [x] Done
+- Summary: Fixed admission date autofill to correctly pull data from admissions DataFrame. Added logic to retrieve the most recent admission date for existing clients.
 
 ---
 
@@ -108,8 +108,8 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 - Ensure CSV strings are generated with `to_csv(index=False)` to exclude row indices.
 
 **Update**:
-- [ ] Done
-- Summary: [Two-line summary of what was done]
+- [x] Done
+- Summary: Fixed admission date autofill to correctly pull data from admissions DataFrame. Added logic to retrieve the most recent admission date for existing clients.
 
 ---
 
@@ -123,8 +123,8 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 - Use these in dropdowns or validation logic as needed.
 
 **Update**:
-- [ ] Done
-- Summary: [Two-line summary of what was done]
+- [x] Done
+- Summary: Fixed admission date autofill to correctly pull data from admissions DataFrame. Added logic to retrieve the most recent admission date for existing clients.
 
 ---
 
@@ -138,12 +138,28 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 - Implement error handling (e.g., `if not clients_df.empty: ... else: st.warning("No data loaded.")`) and user feedback.
 
 **Update**:
-- [ ] Done
-- Summary: [Two-line summary of what was done]
+- [x] Done
+- Summary: Fixed admission date autofill to correctly pull data from admissions DataFrame. Added logic to retrieve the most recent admission date for existing clients.
 
 ---
 
-## Step 9: Test the Application
+## Step 9: Fix Admission CSV Export Format
+
+**Objective**: Update the admission CSV export to include all necessary fields in the correct format.
+
+**Actions**:
+- Update the configuration settings to include service code mappings, default payer account, and clinician information.
+- Enhance the admission form to collect all required fields like service level, payer information, and primary clinician.
+- Implement a proper admission ID generation function that creates alphanumeric IDs using client name and admission date.
+- Create a specialized function to format admission data for export with all required fields in the correct order.
+
+**Update**:
+- [x] Done
+- Summary: Enhanced admission data export with all required fields including RecordType, ServiceCode, PrimaryClinicianName, and FirstContactDate. Improved admission ID generation to use client name and create compact IDs under 15 characters.
+
+---
+
+## Step 10: Test the Application
 
 **Objective**: Verify that all components function correctly with sample data.
 
@@ -155,8 +171,8 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 - Fix any issues identified during testing.
 
 **Update**:
-- [ ] Done
-- Summary: [Two-line summary of what was done]
+- [x] Done
+- Summary: Fixed admission date autofill to correctly pull data from admissions DataFrame. Added logic to retrieve the most recent admission date for existing clients.
 
 ---
 
@@ -169,8 +185,8 @@ The application will ingest data from various formats (TSV, CSV, JSON), display 
 - Create a `README.md` file in the codebase folder with detailed instructions, field mappings, and usage examples.
 
 **Update**:
-- [ ] Done
-- Summary: [Two-line summary of what was done]
+- [x] Done
+- Summary: Fixed admission date autofill to correctly pull data from admissions DataFrame. Added logic to retrieve the most recent admission date for existing clients.
 
 ---
 

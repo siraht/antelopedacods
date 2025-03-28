@@ -83,6 +83,49 @@ def handle_missing_fields(df, required_fields=None):
             
     return df
 
+def extract_admission_data(df):
+    """
+    Extract admission data from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame with potential admission data
+        
+    Returns:
+        pd.DataFrame: DataFrame containing only admission-related data
+    """
+    # Create a new DataFrame for admissions
+    admission_df = pd.DataFrame()
+    
+    # Check if we have the necessary columns for admission data
+    if 'ProviderClientId' in df.columns and 'AdmissionDate' in df.columns:
+        # Extract relevant columns for admissions
+        admission_cols = ['ProviderClientId', 'AdmissionDate']
+        
+        # Add optional columns if they exist
+        if 'ProviderAdmissionId' in df.columns:
+            admission_cols.append('ProviderAdmissionId')
+        if 'AdmissionType' in df.columns:
+            admission_cols.append('AdmissionType')
+        
+        # Create admission DataFrame
+        admission_df = df[admission_cols].copy()
+        
+        # Add provider info
+        from src.config import PROVIDERID, PROVIDERLOCATIONID
+        admission_df['ProviderId'] = PROVIDERID
+        admission_df['ProviderLocationId'] = PROVIDERLOCATIONID
+        
+        # Generate admission IDs if they don't exist
+        if 'ProviderAdmissionId' not in admission_df.columns:
+            from src.data_models import generate_admission_id
+            admission_df['ProviderAdmissionId'] = admission_df['ProviderClientId'].apply(generate_admission_id)
+        
+        # Add default AdmissionType if it doesn't exist
+        if 'AdmissionType' not in admission_df.columns:
+            admission_df['AdmissionType'] = 'New'
+    
+    return admission_df
+
 def process_csv_data(file_obj):
     """
     Process CSV file data.
@@ -91,12 +134,19 @@ def process_csv_data(file_obj):
         file_obj: File object containing CSV data
         
     Returns:
-        pd.DataFrame: Processed DataFrame
+        tuple: (clients_df, admissions_df) - Processed DataFrames
     """
+    # Read the file and normalize the data
     df = pd.read_csv(file_obj, delimiter=',')
     df = normalize_dataframe(df)
-    df = handle_missing_fields(df)
-    return df
+    
+    # Extract admission data before handling missing fields
+    admissions_df = extract_admission_data(df)
+    
+    # Process client data
+    clients_df = handle_missing_fields(df)
+    
+    return clients_df, admissions_df
 
 def process_tsv_data(text):
     """
@@ -106,10 +156,18 @@ def process_tsv_data(text):
         text (str): TSV text
         
     Returns:
-        pd.DataFrame: Processed DataFrame
+        tuple: (clients_df, admissions_df) - Processed DataFrames
     """
     from io import StringIO
+    
+    # Read the data and normalize
     df = pd.read_csv(StringIO(text), delimiter='\t')
     df = normalize_dataframe(df)
-    df = handle_missing_fields(df)
-    return df
+    
+    # Extract admission data before handling missing fields
+    admissions_df = extract_admission_data(df)
+    
+    # Process client data
+    clients_df = handle_missing_fields(df)
+    
+    return clients_df, admissions_df
