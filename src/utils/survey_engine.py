@@ -32,32 +32,74 @@ class SurveyEngine:
             tuple: (success, message) - success is True if import was successful, message contains error or success info
         """
         try:
+            # Find the first opening brace, ignoring any text before it
+            start_idx = json_str.find('{')
+            if start_idx == -1:
+                return False, "No JSON object found in input"
+            
+            # Extract the JSON part
+            json_str = json_str[start_idx:]
+            
             # Parse JSON string
             data = json.loads(json_str)
             
-            # Validate the data structure - should be a dictionary of sequence numbers to values
+            # Validate the data structure
             if not isinstance(data, dict):
-                return False, "Invalid JSON structure. Expected a dictionary of question numbers to values."
+                return False, "Invalid JSON structure. Expected a dictionary of questions to values."
             
-            # Validate sequence numbers
-            valid_seq_nums = [q["sequence_number"] for q in self.questions]
+            # Create a mapping of question text to sequence number
+            question_text_to_seq = {}
+            for q in self.questions:
+                # Create variations of the question text for flexible matching
+                text = q["question_text"]
+                # Store original text
+                question_text_to_seq[text] = q["sequence_number"]
+                # Store lowercase version
+                question_text_to_seq[text.lower()] = q["sequence_number"]
+                # Store without punctuation
+                clean_text = ''.join(c for c in text if c.isalnum() or c.isspace()).strip()
+                question_text_to_seq[clean_text] = q["sequence_number"]
+                question_text_to_seq[clean_text.lower()] = q["sequence_number"]
             
-            # Check sequence numbers and data types
-            for seq_num, value in data.items():
-                # Check if sequence number exists in questions
-                if seq_num not in valid_seq_nums:
-                    return False, f"Unknown question sequence number: {seq_num}"
+            # Process the input data and map to sequence numbers
+            formatted_data = {}
+            unmatched_questions = []
+            
+            for question_text, value in data.items():
+                # Try to find a match for the question text
+                clean_input = ''.join(c for c in question_text if c.isalnum() or c.isspace()).strip()
                 
-                # All values should be strings for consistency
-                data[seq_num] = str(value) if value is not None else ""
+                seq_num = None
+                # Try exact match first, then lowercase, then cleaned versions
+                if question_text in question_text_to_seq:
+                    seq_num = question_text_to_seq[question_text]
+                elif question_text.lower() in question_text_to_seq:
+                    seq_num = question_text_to_seq[question_text.lower()]
+                elif clean_input in question_text_to_seq:
+                    seq_num = question_text_to_seq[clean_input]
+                elif clean_input.lower() in question_text_to_seq:
+                    seq_num = question_text_to_seq[clean_input.lower()]
+                
+                if seq_num is not None:
+                    # Convert value to string for consistency
+                    formatted_data[seq_num] = str(value) if value is not None else ""
+                else:
+                    unmatched_questions.append(question_text)
             
             # Import valid answers
-            self.answers.update(data)
+            self.answers.update(formatted_data)
             
             # Validate imported answers
             self.validate_cross_field()  # Apply cross-field validation rules
             
-            return True, f"Successfully imported {len(data)} survey answers."
+            # Prepare result message
+            message = f"Successfully imported {len(formatted_data)} survey answers."
+            if unmatched_questions:
+                message += f"\nWarning: Could not match {len(unmatched_questions)} questions: {', '.join(unmatched_questions[:3])}"
+                if len(unmatched_questions) > 3:
+                    message += f" and {len(unmatched_questions) - 3} more"
+            
+            return True, message
         
         except json.JSONDecodeError:
             return False, "Invalid JSON format. Please check your input."

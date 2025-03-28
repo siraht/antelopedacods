@@ -769,7 +769,7 @@ ADMISSION_SURVEY_QUESTIONS = {
         },
         {
           "dependencies": ["73", "74"],
-          "condition": "value != '' and (value == answers.get('73', '') or value == answers.get('74', ''))",
+          "condition": "value != '' and (value == answers.get('73', '') or (value == answers.get('74', '') and answers.get('74', '') != '0'))",
           "action": "invalid"
         }
       ]
