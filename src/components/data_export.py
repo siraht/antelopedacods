@@ -2,6 +2,13 @@
 Data export component for downloading client data as CSV files.
 """
 import streamlit as st
+import pandas as pd
+from datetime import datetime
+from src.config import (
+    PROVIDERID, PROVIDERLOCATIONID, SERVICE_CODE_MAPPING,
+    DEFAULT_SERVICE_LEVEL, DEFAULT_PAYER_ACCOUNT_ID, DEFAULT_PRIMARY_CLINICIAN
+)
+from src.utils.data_processing import handle_missing_fields
 
 def format_admissions_for_export():
     """
@@ -10,13 +17,6 @@ def format_admissions_for_export():
     Returns:
         pd.DataFrame: Formatted admissions dataframe ready for export
     """
-    import pandas as pd
-    from datetime import datetime
-    from src.config import (
-        PROVIDERID, PROVIDERLOCATIONID, SERVICE_CODE_MAPPING,
-        DEFAULT_SERVICE_LEVEL, DEFAULT_PAYER_ACCOUNT_ID, DEFAULT_PRIMARY_CLINICIAN
-    )
-    
     # Create a copy of the admissions dataframe
     admissions_df = st.session_state.admissions_df.copy()
     
@@ -72,6 +72,62 @@ def format_admissions_for_export():
     
     return export_df
 
+
+def format_clients_for_export(clients_df):
+    """
+    Format clients data for export according to the required specifications.
+
+    Args:
+        clients_df (pd.DataFrame): Input DataFrame containing client data
+
+    Returns:
+        pd.DataFrame: Formatted DataFrame ready for export
+    """
+    # Create a copy of the clients dataframe
+    export_clients_df = clients_df.copy()
+
+    # Handle missing fields
+    required_fields = [
+        "ProviderClientId", "FirstName", "LastName", "DateofBirth",
+        "Gender", "ZipCode", "City", "Race for reporting"
+    ]
+    export_clients_df = handle_missing_fields(export_clients_df, required_fields)
+
+    # Create a new dataframe with the required fields
+    export_data = {
+        "RecordType": ["Client"] * len(export_clients_df),
+        "ProviderId": [PROVIDERID] * len(export_clients_df),
+        "ProviderClientId": export_clients_df["ProviderClientId"],
+        "SocialSecurityNumber": ["000000000"] * len(export_clients_df),
+        "DateofBirth": export_clients_df["DateofBirth"],
+        "Gender": export_clients_df["Gender"].apply(lambda x: 1 if x == "Male" else 2 if x == "Female" else ""),
+        "LastName": export_clients_df["LastName"],
+        "FirstName": export_clients_df["FirstName"],
+        "MiddleName": [""] * len(export_clients_df),
+        "Address1": [""] * len(export_clients_df),
+        "Address2": [""] * len(export_clients_df),
+        "City": export_clients_df["City"],
+        "CountyID": [""] * len(export_clients_df),
+        "StateID": ["CO"] * len(export_clients_df),
+        "ZipCode": export_clients_df["ZipCode"].apply(lambda x: str(x) + "0000" if x else ""),
+        "PhoneNumber": [""] * len(export_clients_df),
+        "MedicaidID": [""] * len(export_clients_df),
+        "OutofStateFlag": ["0"] * len(export_clients_df),
+        "ClientisHomelessFlag": [""] * len(export_clients_df),
+        "RaceWhite": [""] * len(export_clients_df),
+        "RaceBlack": [""] * len(export_clients_df),
+        "RaceAmericanIndianAlaskanNative": [""] * len(export_clients_df),
+        "RaceAsian": [""] * len(export_clients_df),
+        "RaceNativeHawaiianPacificIslander": [""] * len(export_clients_df),
+        "RaceDeclined": export_clients_df["Race for reporting"].apply(lambda x: 1 if x == "Decline to answer" else 0),
+        "Ethnicity": [""] * len(export_clients_df),
+    }
+
+    export_df = pd.DataFrame(export_data)
+
+    return export_df
+
+
 def show_data_export_page():
     """Display and handle the data export UI."""
     st.header("Data Export")
@@ -83,9 +139,12 @@ def show_data_export_page():
     # Client data export
     with col1:
         if not st.session_state.clients_df.empty:
+            # Format clients for export
+            export_clients_df = format_clients_for_export(st.session_state.clients_df)
+
             st.download_button(
                 label="Download Clients",
-                data=st.session_state.clients_df.to_csv(index=False),
+                data=export_clients_df.to_csv(index=False),
                 file_name="clients.csv",
                 mime="text/csv"
             )
